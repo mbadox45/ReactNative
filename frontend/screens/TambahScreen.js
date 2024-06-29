@@ -1,18 +1,28 @@
 import { View, ScrollView, StyleSheet } from 'react-native'
-import React, { useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { Appbar, Text, TextInput, RadioButton, Checkbox } from 'react-native-paper'
+import { Appbar, Text, TextInput, RadioButton, Checkbox, Snackbar } from 'react-native-paper'
 import { SelectList } from 'react-native-dropdown-select-list'
 
 // DB SQLite
-import { saveSiswa } from '../../backend/SiswaDatabase'
+import { saveSiswa, updateSiswa } from '../../backend/SiswaDatabase'
 
 // Components
 import FormLabel from '../components/FormLabel'
 
-const TambahScreen = ({navigation}) => {
+// Context dari Siswa Context
+import { SiswaContext } from '../../SiswaContext'
+
+const TambahScreen = ({navigation, route}) => {
+
+    // Validasi menggunakan SnackBar
+    const [visible, setVisible] = useState(false);
+    const onToggleSnackBar = () => setVisible(!visible);
+    const onDismissSnackBar = () => setVisible(false);
 
     // Variable UseState
+    const [status, setStatus] = useState("")
+    const [id, setId] = useState("")
     const [firstName, setFirstName] = useState("")
     const [lastName, setLastName] = useState("")
     const [gender, setGender] = useState("pria")
@@ -22,6 +32,7 @@ const TambahScreen = ({navigation}) => {
     const [membaca, setMembaca] = useState(false)
     const [menulis, setMenulis] = useState(false)
     const [menggambar, setMenggambar] = useState(false)
+    const [context, setContext] = useContext(SiswaContext)
 
     // Variable Array
     const hobby = {
@@ -36,13 +47,62 @@ const TambahScreen = ({navigation}) => {
         {key:'4', value:'SMA'},
     ]
 
+    // Params Value from DetailScreen
+    const rute = route.params;
+
     // Aksi SQLite
     const handleAddSiswa = () => {
-        saveSiswa(firstName, lastName, phoneNum, gender, jenjang, hobby, alamat, (id) => { console.log("Item ditambahkan dengan id :" + id)});
-        navigation.goBack();
+        if (!firstName || !lastName || !phoneNum || !gender || !jenjang || !hobby || !alamat) {
+            onToggleSnackBar();
+        } else {
+            saveSiswa(firstName, lastName, phoneNum, gender, jenjang, hobby, alamat, (id) => { console.log("Item ditambahkan dengan id :" + id)});
+            console.log(firstName, lastName, phoneNum, gender, jenjang, hobby, alamat)
+            setContext(context+1);
+            navigation.navigate("Home");
+        }
+    }
+    const handleUpdateSiswa = () => {
+        updateSiswa(firstName, lastName, phoneNum, gender, jenjang, hobby, alamat, id);
+        console.log(firstName, lastName, phoneNum, gender, jenjang, hobby, alamat)
+        setContext(context+1);
+        navigation.navigate("Home");
     }
 
+    let newJenjang;
 
+    const loadDataSiswa = () => {
+        if (rute.status === 'edit') {
+            setId(rute.id);
+            setFirstName(rute.first_name);
+            setLastName(rute.last_name);
+            setGender(rute.gender);
+            setJenjang(rute.jenjang);
+            setAlamat(rute.alamat);
+            setPhoneNum(rute.phone.toString());
+            setStatus(rute.status);
+            const hobi = JSON.parse(rute.hobi);
+            setMembaca(hobi.membaca);
+            setMenulis(hobi.menulis);
+            setMenggambar(hobi.menggambar);
+            newJenjang = data_jenjang.find((obj) => obj.value == jenjang)
+        } else {
+            setId("");
+            setFirstName("");
+            setLastName("");
+            setGender("");
+            setJenjang("");
+            setAlamat("");
+            setPhoneNum("");
+            setStatus("");
+            setMembaca(false);
+            setMenulis(false);
+            setMenggambar(false);
+        }
+    }
+
+    useEffect(() => {
+        loadDataSiswa();
+    },[])
 
     return (
         <SafeAreaProvider>
@@ -50,8 +110,8 @@ const TambahScreen = ({navigation}) => {
                 <View style={{flex:1}}>
                     <Appbar.Header style={{backgroundColor: '#CA6F1E'}}>
                         <Appbar.BackAction color='white' onPress={() => {navigation.goBack()}} />
-                        <Appbar.Content title="Tambah Siswa" titleStyle={{color: 'white'}} />
-                        <Appbar.Action color='white' icon="content-save" onPress={handleAddSiswa} />
+                        <Appbar.Content title={rute.status === 'add' ? "Tambah Siswa" : "Edit Siswa"} titleStyle={{color: 'white'}} />
+                        <Appbar.Action color='white' icon="content-save" onPress={rute.status === 'add' ? handleAddSiswa : handleUpdateSiswa} />
                     </Appbar.Header>
                     <View style={styles.body_form}>
                         <View style={styles.body_form_nama}>
@@ -75,8 +135,9 @@ const TambahScreen = ({navigation}) => {
                         <FormLabel text={'Jenjang'}/>
                         <View style={styles.dropdown_jenjang}>
                             <SelectList 
-                                setSelected={(val) => setJenjang(val)} 
+                                setSelected={(val) => {setJenjang(val); console.log(val)}} 
                                 data={data_jenjang} 
+                                defaultOption={rute.status === 'edit' ? newJenjang : {key:'1',value:'TK'}}
                                 save="value"
                                 placeholder='Pilih Jenjang'
                             />
@@ -87,10 +148,26 @@ const TambahScreen = ({navigation}) => {
                             <Checkbox.Item label="Menulis" status={menulis ? 'checked' : 'unchecked'} onPress={() => {setMenulis(!menulis)}}/>
                             <Checkbox.Item label="Menggambar" status={menggambar ? 'checked' : 'unchecked'} onPress={() => {setMenggambar(!menggambar)}}/>
                         </View>
-                        <TextInput style={{marginTop:10}} multiline={true} numberOfLines={4} mode='outlined' label={'Alamat'} value={alamat} onChangeText={setAlamat}/>
+                        <View>
+                            <TextInput style={{marginTop:10}} multiline={true} numberOfLines={4} mode='outlined' label={'Alamat'} value={alamat} onChangeText={setAlamat}/>
+                        </View>
                     </View>
                 </View>
             </ScrollView>
+            <View >
+                <Snackbar
+                    visible={visible}
+                    onDismiss={onDismissSnackBar}
+                    action={{
+                        label: 'Undo',
+                        onPress: () => {
+                            // Do something
+                        },
+                    }}
+                    style={{}}>
+                    Maaf, Sata Wajib di Isi
+                </Snackbar>
+            </View>
         </SafeAreaProvider>
     )
 }
